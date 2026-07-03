@@ -1,0 +1,15 @@
+[Unit]
+Description=WebFetch maintenance
+
+[Service]
+Type=oneshot
+User=webfetch
+Group=webfetch
+EnvironmentFile=/etc/webfetch/service.env
+ExecStart=/usr/local/bin/webfetch-launch maintenance
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/webfetch
+

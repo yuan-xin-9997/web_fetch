@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+component="${1:?component is required}"
+app_root="${WEBFETCH_APP_ROOT:?WEBFETCH_APP_ROOT is required}"
+
+case "$component" in
+  api) executable="webfetch-api" ;;
+  worker) executable="webfetch-worker" ;;
+  maintenance) executable="webfetch-maintenance" ;;
+  *) echo "unknown component: $component" >&2; exit 2 ;;
+esac
+
+cd "$app_root/current"
+exec "$app_root/current/.venv/bin/$executable"
+

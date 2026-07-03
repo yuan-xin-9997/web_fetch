@@ -105,8 +105,8 @@ WebFetch API
           ├── Browser Worker
           └── Adapter/Parser
 
-Redis           PostgreSQL            NAS 文件存储
-短期缓存/队列    任务/元数据/结果索引    HTML/JSON/截图/错误现场
+Redis           PostgreSQL            Ubuntu 文件存储
+短期缓存/锁      任务/元数据/结果索引    HTML/JSON/截图/错误现场
 ```
 
 ### 6.1 技术约束
@@ -115,7 +115,7 @@ Redis           PostgreSQL            NAS 文件存储
 - API 框架：FastAPI；
 - HTTP 客户端：httpx 异步客户端；
 - 浏览器：Playwright + Chromium；
-- 队列和短期缓存：Redis；
+- 短期缓存和分布式锁：Redis；任务队列持久化在 PostgreSQL；
 - 持久化数据库：PostgreSQL；
 - 进程管理：systemd；
 - 反向代理：可使用现有 Nginx；
@@ -127,8 +127,8 @@ Redis           PostgreSQL            NAS 文件存储
 - API、HTTP Worker、Browser Worker：`192.168.0.111`；
 - PostgreSQL：`192.168.0.100:15432`，使用独立数据库和最小权限用户，不使用默认业务库账号硬编码；
 - 代理：`http://192.168.0.100:7890`；
-- 原始文件：优先挂载 NAS 目录到 Ubuntu，例如 `/mnt/nas/AppHome/webfetch`；
-- Redis：可原生安装于 Ubuntu VM，监听本机或受限内网地址，不暴露公网。
+- 原始文件：当前保存在 Ubuntu 本地可配置目录，默认部署目录为 `/var/lib/webfetch/artifacts`；
+- Redis：原生安装于 Ubuntu VM，监听本机地址，不暴露公网。
 
 ## 7. 功能需求
 
@@ -416,7 +416,7 @@ POST /v1/extract
 
 - 月度服务可用性目标为 99.5%；
 - API 和 Worker 由 systemd 自动重启；
-- PostgreSQL、Redis 或 NAS 暂时不可用时必须明确降级或拒绝，不得伪造成功；
+- PostgreSQL、Redis 或 artifact 目录暂时不可用时必须明确降级或拒绝，不得伪造成功；
 - 已持久化任务在服务重启后可以继续处理；
 - 服务启动时应恢复超时的运行中任务；
 - 配置错误应导致启动失败并输出明确原因。
@@ -461,7 +461,7 @@ POST /v1/extract
 - HTTP Worker 与 Browser Worker 活跃数；
 - 浏览器启动失败和 Context 泄漏数量；
 - 重试、限流、熔断和代理失败数量；
-- NAS 可用空间及文件写入失败数量。
+- artifact 所在磁盘可用空间及文件写入失败数量。
 
 ### 10.5 可维护性
 
@@ -487,7 +487,7 @@ POST /v1/extract
 ```yaml
 server:
   host: 192.168.0.111
-  port: 9120
+  port: 33333
   sync_timeout_seconds: 30
 
 workers:
@@ -520,7 +520,7 @@ fetch:
 /etc/webfetch/secrets.env      密钥，权限 0600
 /var/lib/webfetch/             本机运行数据和临时文件
 /var/log/webfetch/             可选文件日志
-/mnt/nas/AppHome/webfetch/     NAS 原始文件存储
+/var/lib/webfetch/artifacts/   Ubuntu 本地原始文件存储
 ```
 
 ### 12.2 Linux 用户
@@ -579,7 +579,7 @@ systemd 单元必须满足：
 - HTTP 自动升级 Browser；
 - Browser Context 和 Profile 隔离；
 - Worker 被强制终止后的任务恢复；
-- Redis、PostgreSQL、NAS 短暂故障及恢复；
+- Redis、PostgreSQL、artifact 目录短暂故障及恢复；
 - 缓存命中、强制刷新、进行中请求合并和 stale 返回。
 
 ### 13.3 适配器回归测试
@@ -610,7 +610,7 @@ systemd 单元必须满足：
 
 1. Ubuntu 重启后所有服务自动恢复。
 2. API 或 Worker 异常退出后 systemd 自动重启。
-3. PostgreSQL、Redis 或 NAS 不可用时 Ready 检查失败并输出明确原因。
+3. PostgreSQL、Redis 或 artifact 目录不可用时 Ready 检查失败并输出明确原因。
 4. journald 中不存在明文 API Key、Cookie、数据库密码或认证头。
 5. `/metrics` 可查看请求、缓存、队列、Worker、重试和错误指标。
 6. 新版本发布失败后可回滚至上一可用版本。
@@ -631,9 +631,9 @@ systemd 单元必须满足：
 
 - FastAPI 与 API Key；
 - HTTP/Browser/auto；
-- Redis 队列和缓存；
+- PostgreSQL 持久任务队列和 Redis 缓存；
 - PostgreSQL 任务记录；
-- NAS 原始 HTML 保存；
+- Ubuntu 本地原始 HTML 保存；
 - 域名限速、重试和去重；
 - systemd 部署；
 - 健康检查与基础指标。
@@ -662,21 +662,18 @@ systemd 单元必须满足：
 | 目标网站页面改版 | 适配器版本化、样本回归、字段缺失告警 |
 | 网站反爬或账号封禁 | 限速、缓存、熔断、身份隔离，遵守目标网站规则 |
 | Chromium 内存较高 | 限制并发、复用浏览器、定期回收进程 |
-| NAS 短暂不可用 | Ready 失败、任务延迟执行、禁止伪成功 |
-| Redis 任务重复投递 | 幂等抓取键、数据库状态约束、结果去重 |
+| artifact 磁盘短暂不可用 | Ready 失败、任务延迟执行、禁止伪成功 |
+| PostgreSQL 任务重复领取 | 租约、行锁、幂等抓取键、结果去重 |
 | 登录态泄露 | 加密存储、最小权限、日志脱敏、API 权限隔离 |
 | 服务成为 SSRF 跳板 | 地址校验、内网白名单、重定向复检、调用方认证 |
 | 抓取结果具有法律或合规风险 | 记录来源和时间，遵守 robots、服务条款、版权和隐私要求 |
 
-## 17. 待确认事项
+## 17. 已确认的部署与业务约束
 
-下列事项不阻塞 MVP 设计，但应在实施前确认：
-
-1. WebFetch 对外使用的内网端口及是否配置独立域名；
-2. NAS 目录通过 NFS 还是 SMB 挂载到 Ubuntu；
-3. Redis 安装在 Ubuntu VM 还是使用 NAS 上现有实例；
-4. PostgreSQL 是否创建独立数据库 `webfetch` 和独立最小权限用户；
-5. 首批需要实现专用适配器的网站清单；
-6. 哪些网站需要登录 Profile，以及登录状态的更新方式；
-7. 是否需要通过现有 Nginx/Cloudflare Tunnel 暴露给局域网外的业务系统。
-
+1. 服务端口必须可配置，默认使用 `33333`；未来可能由用户配置独立域名。
+2. 当前不挂载 NAS，原始文件先保存在 Ubuntu 本地可配置目录中。
+3. Redis 原生安装在 Ubuntu VM，不使用 Docker。
+4. PostgreSQL 创建独立数据库和独立服务用户；仓库必须保存可复用的初始化 SQL。
+5. 首批内容目标为中国中央媒体、中国主流媒体及欧美主流媒体官网。首版使用通用新闻适配器和域名策略覆盖，根据失败样本逐站点增加专用适配器。
+6. 暂无明确需要登录的网站；Profile 能力保留，但首版不预置登录账号和自动登录流程。
+7. 服务先提供内网访问；独立域名、Nginx 或 Cloudflare Tunnel 由用户后续配置。

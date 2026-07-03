@@ -1,0 +1,23 @@
+[Unit]
+Description=WebFetch HTTP Worker
+After=network-online.target redis-server.service webfetch-api.service
+
+[Service]
+Type=simple
+User=webfetch
+Group=webfetch
+EnvironmentFile=/etc/webfetch/service.env
+Environment=WEBFETCH_WORKER_QUEUE=http
+ExecStart=/usr/local/bin/webfetch-launch worker
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/webfetch
+
+[Install]
+WantedBy=multi-user.target
+

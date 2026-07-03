@@ -1,0 +1,61 @@
+pipeline {
+    agent any
+
+    parameters {
+        string(name: 'DEPLOY_ROOT', defaultValue: '/opt/webfetch', description: 'Linux deployment root')
+        string(name: 'SERVICE_USER', defaultValue: 'webfetch', description: 'Linux service account')
+    }
+
+    triggers {
+        pollSCM('H/30 * * * *')
+    }
+
+    options {
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        stage('Test') {
+            steps {
+                sh '''
+                    python3 -m venv .jenkins-venv
+                    .jenkins-venv/bin/python -m pip install -e '.[dev]'
+                    .jenkins-venv/bin/ruff check src tests
+                    mkdir -p build/test-results
+                    .jenkins-venv/bin/pytest --cov=webfetch_service --cov-fail-under=80 \
+                      --junitxml=build/test-results/pytest.xml
+                '''
+            }
+        }
+        stage('Stop, update and start') {
+            steps {
+                sh '''
+                    sudo bash scripts/install-native.sh "$WORKSPACE" "$DEPLOY_ROOT" "$SERVICE_USER"
+                '''
+            }
+        }
+        stage('Smoke test') {
+            steps {
+                sh '''
+                    set -a
+                    . /etc/webfetch/service.env
+                    set +a
+                    curl --fail --silent --show-error "http://127.0.0.1:${WEBFETCH_SERVER__PORT:-33333}/health/live"
+                    curl --fail --silent --show-error "http://127.0.0.1:${WEBFETCH_SERVER__PORT:-33333}/health/ready"
+                '''
+            }
+        }
+    }
+
+    post {
+        always {
+            junit allowEmptyResults: true, testResults: 'build/test-results/*.xml'
+        }
+    }
+}

@@ -1,0 +1,23 @@
+[Unit]
+Description=WebFetch API
+After=network-online.target redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=webfetch
+Group=webfetch
+EnvironmentFile=/etc/webfetch/service.env
+ExecStart=/usr/local/bin/webfetch-launch api
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/webfetch
+
+[Install]
+WantedBy=multi-user.target
+
