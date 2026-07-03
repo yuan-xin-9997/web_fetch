@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "webfetch"
+version = "0.1.0"
+description = "通用网页抓取共享库"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.25",
+    "lxml>=5.0",
+]
+
+[project.optional-dependencies]
+browser = ["playwright>=1.40"]
+parser = ["beautifulsoup4>=4.12", "trafilatura>=1.8"]
+redis = ["redis>=5.0"]
+all = [
+    "playwright>=1.40",
+    "beautifulsoup4>=4.12",
+    "trafilatura>=1.8",
+    "redis>=5.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["webfetch*"]
