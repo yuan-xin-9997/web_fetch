@@ -418,6 +418,7 @@ WEBFETCH_AUTH__BOOTSTRAP_API_KEY
 8. 启动 API 和 Worker；
 9. 调用 live/ready 冒烟检查；
 10. 失败时切回上一链接并恢复服务。
+11. 健康检查成功后清理旧 release，默认保留最近 5 个且始终保护 `current` 指向的目录；保留数由 `WEBFETCH_RELEASES_TO_KEEP` 配置，最小为 2。
 
 Jenkinsfile 不写入环境密码；部署路径、服务名、Python 路径和健康地址均使用参数或环境变量。
 

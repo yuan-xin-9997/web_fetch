@@ -192,6 +192,45 @@ sudo bash scripts/install-native.sh "$PWD" /opt/webfetch webfetch
 
 安装脚本会创建版本目录、安装 Python 依赖、执行 Alembic、安装 systemd 单元、启动服务并检查 Ready 状态。失败时会尝试切回上一版本。
 
+### 5. 服务器目录结构
+
+标准部署在 Ubuntu 服务器上使用以下目录结构：
+
+```text
+/opt/webfetch/
+├── current -> releases/<当前发布版本>   当前运行版本的软链接
+└── releases/                           Jenkins/安装脚本生成的版本目录
+    ├── <历史发布版本>/
+    └── <当前发布版本>/
+        ├── .venv/                      当前版本独立 Python 虚拟环境
+        ├── src/                        应用源码
+        ├── migrations/                 数据库迁移
+        ├── scripts/                    运维及测试脚本
+        ├── sql/                        数据库初始化脚本
+        ├── docs/                       需求和设计文档
+        └── README.md
+
+/etc/webfetch/
+├── service.env                         主配置及服务端密钥，root:webfetch 0640
+└── api-key                            供管理员向下游分发的 API Key，root:webfetch 0640
+
+/var/lib/webfetch/
+├── artifacts/                          抓取结果及原始响应文件
+├── .cache/ms-playwright/               Playwright 浏览器文件
+└── .local/                             webfetch 服务用户运行数据
+
+/etc/systemd/system/
+├── webfetch-api.service
+├── webfetch-http-worker.service
+└── webfetch-browser-worker.service
+
+/usr/local/bin/webfetch-launch          systemd 统一启动入口
+/usr/local/sbin/webfetch-jenkins-deploy Jenkins 受限部署入口
+/etc/sudoers.d/webfetch-jenkins         Jenkins 最小 sudo 权限规则
+```
+
+`/opt/webfetch/current` 只负责选择当前版本，持久配置和抓取数据不会放在发布目录内，因此切换或回滚版本不会覆盖 `/etc/webfetch` 和 `/var/lib/webfetch`。
+
 ## 运维方式
 
 ```bash
@@ -203,12 +242,35 @@ systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker
 systemctl list-timers webfetch-maintenance.timer
 ```
 
-部署进程：
+### systemd 服务
 
-- `webfetch-api`：同步 API；
-- `webfetch-http-worker`：只领取显式 HTTP 任务；
-- `webfetch-browser-worker`：领取 `auto` 和 `browser` 任务；
-- `webfetch-maintenance.timer`：清理遗留临时文件。
+三个 WebFetch 服务都以低权限的 `webfetch:webfetch` 用户运行，读取 `/etc/webfetch/service.env`，配置为开机启动并在异常退出时自动重启：
+
+| 服务 | 作用 | 主要依赖与限制 |
+|---|---|---|
+| `webfetch-api.service` | 提供 REST API、同步抓取和任务查询 | 在网络和 Redis 之后启动；监听地址及端口由配置决定 |
+| `webfetch-http-worker.service` | 领取 `http` 队列，执行普通 HTTP 抓取 | 在 API 和 Redis 之后启动 |
+| `webfetch-browser-worker.service` | 领取 `browser` 队列，执行 Playwright 抓取 | 在 API 和 Redis 之后启动；默认设置 `MemoryMax=3G` |
+
+本机还有两个相关服务：
+
+| 服务 | 类型 | 与 WebFetch 的关系 |
+|---|---|---|
+| `redis-server.service` | 运行依赖 | 提供缓存、请求合并和任务队列；应仅监听本机地址，WebFetch API 和 Worker 均依赖它 |
+| `jenkins.service` | 构建部署依赖 | 检出代码、执行检查和测试、创建新 release、切换 `current`、重启服务并检查健康状态；WebFetch 已启动后，请求处理不依赖 Jenkins |
+
+`webfetch-maintenance.timer` 用于定期清理遗留临时文件。PostgreSQL 是部署在外部数据库服务器上的运行依赖，因此不属于 111 服务器上的 systemd 服务。
+
+查看全部相关服务：
+
+```bash
+systemctl status \
+  webfetch-api \
+  webfetch-http-worker \
+  webfetch-browser-worker \
+  redis-server \
+  jenkins
+```
 
 备份至少包含 PostgreSQL `webfetch` 数据库、`/etc/webfetch/service.env` 的安全副本和 artifact 目录。配置副本必须按密钥材料管理。
 
@@ -235,6 +297,8 @@ Pipeline 每 30 分钟轮询 SCM；只有存在新提交时触发。流水线执
 
 生产部署使用 root 所有的固定入口 `deploy/webfetch-jenkins-deploy`。应将它安装为 `/usr/local/sbin/webfetch-jenkins-deploy`，并只为 Jenkins 放行这一条 sudo 命令，禁止授予 Jenkins 全局免密 sudo。
 仓库中的 `deploy/sudoers-webfetch-jenkins` 给出了与 `WebFetchService` Job 精确匹配的 sudoers 规则。
+
+部署脚本在新版本健康检查成功后自动清理旧发布目录。默认保留 `/opt/webfetch/releases` 下最近 5 个版本，可通过 `/etc/webfetch/service.env` 中的 `WEBFETCH_RELEASES_TO_KEEP` 调整，最小值为 2；`/opt/webfetch/current` 指向的版本始终受到保护。健康检查失败并回滚时不会执行清理。
 
 ## 测试
 

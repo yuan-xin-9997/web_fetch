@@ -19,6 +19,41 @@ release_dir="$app_root/releases/$release_id"
 previous="$(readlink -f "$app_root/current" 2>/dev/null || true)"
 services=(webfetch-browser-worker webfetch-http-worker webfetch-api)
 
+cleanup_old_releases() {
+  local releases_dir="$app_root/releases"
+  local keep="${WEBFETCH_RELEASES_TO_KEEP:-5}"
+  local current_release candidate
+  local index=0
+  local -a release_dirs=()
+
+  if [[ ! "$keep" =~ ^[0-9]+$ ]] || (( keep < 2 )); then
+    echo "WEBFETCH_RELEASES_TO_KEEP must be an integer greater than or equal to 2" >&2
+    return 1
+  fi
+
+  current_release="$(readlink -f "$app_root/current")"
+  mapfile -t release_dirs < <(
+    find "$releases_dir" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+      | sort -nr \
+      | cut -d' ' -f2-
+  )
+
+  for candidate in "${release_dirs[@]}"; do
+    candidate="$(realpath "$candidate")"
+    if [[ "$(dirname "$candidate")" != "$(realpath "$releases_dir")" ]]; then
+      echo "refusing to remove release outside $releases_dir: $candidate" >&2
+      return 1
+    fi
+    if (( index < keep )) || [[ "$candidate" == "$current_release" ]]; then
+      ((index += 1))
+      continue
+    fi
+    rm -rf -- "$candidate"
+    echo "removed_old_release=$candidate"
+    ((index += 1))
+  done
+}
+
 for service in "${services[@]}"; do
   systemctl stop "$service" 2>/dev/null || true
 done
@@ -54,4 +89,5 @@ if [[ "$ready" != true ]]; then
   exit 1
 fi
 
+cleanup_old_releases
 echo "deployed_release=$release_dir"
