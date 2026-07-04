@@ -22,7 +22,7 @@ async def test_cppcc_profile_layout() -> None:
     assert result["current_position"] == "现任国务院副总理、党组成员。"
     assert result["timeline"] == [
         {"period": "1973－1976", "position": "福建省永定县立新知青农场知青"},
-        {"period": "2018－至今", "position": "十三届全国政协副主席"},
+        {"period": "2018－", "position": "十三届全国政协副主席"},
     ]
     assert "无关导航" not in result["summary"]
 

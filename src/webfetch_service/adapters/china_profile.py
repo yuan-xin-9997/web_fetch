@@ -114,7 +114,7 @@ class ChinaOfficialProfileAdapter:
     def _timeline_item(line: str) -> dict[str, str] | None:
         bounded = BOUNDED_PERIOD.match(line)
         if bounded:
-            end = bounded.group("end") or "至今"
+            end = bounded.group("end") or ""
             return {
                 "period": f"{bounded.group('start')}－{end}",
                 "position": bounded.group("position").strip(),
