@@ -156,9 +156,13 @@ DNS 结果在单次请求内固定使用于判定，并在连接后校验最终 
 
 ## 7. 身份认证与敏感信息
 
+- API Key 是 WebFetch 发放给下游业务系统的服务端调用凭据，不是目标网站的登录凭据；
 - API Key 格式为随机高熵字符串；数据库只存 SHA-256/HMAC 摘要；
 - 请求使用 `Authorization: Bearer`；
 - 首版支持通过配置提供 bootstrap API Key，启动时转换为内存摘要，永不打印；
+- 当前首版的 bootstrap API Key 由所有下游系统共享，因此仅提供统一认证；按调用方独立签发、吊销、限流和审计属于后续调用方管理设计；
+- 下游系统必须通过环境变量或密钥管理设施保存 Key，不得硬编码、提交到 Git 或输出到日志；
+- Ubuntu 生产部署通过 `/etc/webfetch/service.env` 向服务注入 Key，并将可供管理员分发的明文副本保存在权限受限的 `/etc/webfetch/api-key`；
 - 管理接口要求 `admin` scope；
 - Cookie、Authorization、Proxy-Authorization 等字段经过统一脱敏器；
 - Profile 状态文件独立目录，权限 `0600`，逻辑标识不含用户名；
