@@ -45,7 +45,15 @@ systemctl enable webfetch-api webfetch-http-worker webfetch-browser-worker webfe
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
 
 port="${WEBFETCH_SERVER__PORT:-33333}"
-if ! curl --fail --silent --show-error "http://127.0.0.1:$port/health/ready" >/dev/null; then
+ready=false
+for _ in $(seq 1 30); do
+  if curl --fail --silent "http://127.0.0.1:$port/health/ready" >/dev/null; then
+    ready=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$ready" != true ]]; then
   echo "health check failed" >&2
   if [[ -n "$previous" && -d "$previous" ]]; then
     ln -sfn "$previous" "$app_root/current"
