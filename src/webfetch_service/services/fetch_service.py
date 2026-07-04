@@ -171,6 +171,7 @@ class FetchService:
             "profile": request.profile,
             "proxy_policy": request.proxy_policy.value,
             "headers": headers,
+            "save_artifact": request.save_artifact,
         }
         return hashlib.sha256(json.dumps(data, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 

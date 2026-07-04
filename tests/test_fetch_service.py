@@ -16,6 +16,16 @@ def test_fetch_key_separates_identity_and_mode() -> None:
     assert "first" not in FetchService._fetch_key(base)
 
 
+def test_fetch_key_separates_artifact_requirement() -> None:
+    default_artifact = FetchRequest(url="https://example.com/", mode="auto", save_artifact=None)
+    without_artifact = FetchRequest(url="https://example.com/", mode="auto", save_artifact=False)
+    with_artifact = FetchRequest(url="https://example.com/", mode="auto", save_artifact=True)
+
+    assert FetchService._fetch_key(default_artifact) != FetchService._fetch_key(without_artifact)
+    assert FetchService._fetch_key(default_artifact) != FetchService._fetch_key(with_artifact)
+    assert FetchService._fetch_key(without_artifact) != FetchService._fetch_key(with_artifact)
+
+
 def test_production_rejects_default_key() -> None:
     settings = Settings(
         environment="production", auth=AuthSettings(bootstrap_api_key=SecretStr("change-me-before-production"))

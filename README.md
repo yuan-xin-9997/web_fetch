@@ -80,6 +80,8 @@ curl -X POST 'http://server-host:33333/v1/fetch' \
 - `browser`：只使用 Playwright；
 - `auto`：先 HTTP，根据状态码、挑战页特征和关键选择器决定是否升级浏览器。
 
+需要继续调用 `generic.links`、`generic.article` 等提取适配器时，请设置 `save_artifact: true`。缓存键会区分 `save_artifact` 的 `null`、`false`、`true` 三种状态，保证要求保存 artifact 的请求不会复用缺少 `artifact_id` 的缓存结果。
+
 ## 配置文件说明
 
 所有配置使用 `WEBFETCH_` 前缀环境变量，层级以双下划线分隔。完整模板见 [.env.example](.env.example)。

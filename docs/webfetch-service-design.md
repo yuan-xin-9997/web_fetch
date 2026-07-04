@@ -108,6 +108,8 @@ src/webfetch_service/
   → 返回统一响应
 ```
 
+`fetch_key` 必须包含请求的 `save_artifact` 原始三态值。`null` 表示服从服务端默认配置，语义不同于显式 `false` 或 `true`；三个值必须生成不同缓存键，防止要求保存 artifact 的请求命中没有 `artifact_id` 的旧缓存。
+
 缓存和分布式锁不可用时，首版允许在配置开启的情况下退化为本进程锁；降级必须记录指标和警告。PostgreSQL 或 artifact 存储不可用时，若请求要求保存证据，则 Ready 失败并拒绝执行。
 
 ### 5.2 异步任务
