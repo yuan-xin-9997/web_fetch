@@ -42,8 +42,9 @@ pipeline {
         stage('Smoke test') {
             steps {
                 sh '''
-                    curl --fail --silent --show-error "$HEALTH_URL/health/live"
-                    curl --fail --silent --show-error "$HEALTH_URL/health/ready"
+                    health_url="${HEALTH_URL:-http://127.0.0.1:33333}"
+                    curl --fail --silent --show-error "$health_url/health/live"
+                    curl --fail --silent --show-error "$health_url/health/ready"
                 '''
             }
         }
