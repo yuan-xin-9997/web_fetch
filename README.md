@@ -145,6 +145,13 @@ psql -h database-host -U postgres \
 
 脚本可重复执行，并会创建或更新独立的 `webfetch` 用户和数据库。
 
+也可以使用辅助脚本自动生成随机服务密码，并把密码写入权限受限的指定文件：
+
+```bash
+scripts/bootstrap_database.sh database-host 5432 admin-user admin-password \
+  sql/init-postgresql.sql /secure/path/webfetch-db-password
+```
+
 ### 3. 创建服务用户和配置
 
 ```bash
@@ -153,6 +160,12 @@ sudo install -d -m 0750 -o root -g webfetch /etc/webfetch
 sudo cp .env.example /etc/webfetch/service.env
 sudo chmod 0640 /etc/webfetch/service.env
 sudo editor /etc/webfetch/service.env
+```
+
+仓库也提供参数化初始化脚本。它会创建服务用户、生成随机 API Key、写入权限受限的配置文件并启动 Redis：
+
+```bash
+sudo scripts/configure_server.sh database-host 5432 /secure/path/webfetch-db-password
 ```
 
 ### 4. 发布
