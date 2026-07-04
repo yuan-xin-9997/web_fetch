@@ -1,6 +1,10 @@
 pipeline {
     agent any
 
+    parameters {
+        string(name: 'HEALTH_URL', defaultValue: 'http://127.0.0.1:33333', description: 'WebFetch health-check base URL')
+    }
+
     triggers {
         pollSCM('H/30 * * * *')
     }
@@ -38,11 +42,8 @@ pipeline {
         stage('Smoke test') {
             steps {
                 sh '''
-                    set -a
-                    . /etc/webfetch/service.env
-                    set +a
-                    curl --fail --silent --show-error "http://127.0.0.1:${WEBFETCH_SERVER__PORT:-33333}/health/live"
-                    curl --fail --silent --show-error "http://127.0.0.1:${WEBFETCH_SERVER__PORT:-33333}/health/ready"
+                    curl --fail --silent --show-error "$HEALTH_URL/health/live"
+                    curl --fail --silent --show-error "$HEALTH_URL/health/ready"
                 '''
             }
         }
