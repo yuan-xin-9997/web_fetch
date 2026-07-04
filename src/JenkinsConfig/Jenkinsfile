@@ -1,11 +1,6 @@
 pipeline {
     agent any
 
-    parameters {
-        string(name: 'DEPLOY_ROOT', defaultValue: '/opt/webfetch', description: 'Linux deployment root')
-        string(name: 'SERVICE_USER', defaultValue: 'webfetch', description: 'Linux service account')
-    }
-
     triggers {
         pollSCM('H/30 * * * *')
     }
@@ -36,7 +31,7 @@ pipeline {
         stage('Stop, update and start') {
             steps {
                 sh '''
-                    sudo bash scripts/install-native.sh "$WORKSPACE" "$DEPLOY_ROOT" "$SERVICE_USER"
+                    sudo /usr/local/sbin/webfetch-jenkins-deploy "$WORKSPACE"
                 '''
             }
         }

@@ -217,6 +217,8 @@ src/JenkinsConfig/Jenkinsfile
 
 Pipeline 每 30 分钟轮询 SCM；只有存在新提交时触发。流水线执行检出、依赖安装、静态检查、覆盖率不低于 80% 的测试、原生发布和健康检查。Jenkins 运行用户需要对限定的部署脚本和相关 systemd 服务拥有 sudo 权限。
 
+生产部署使用 root 所有的固定入口 `deploy/webfetch-jenkins-deploy`。应将它安装为 `/usr/local/sbin/webfetch-jenkins-deploy`，并只为 Jenkins 放行这一条 sudo 命令，禁止授予 Jenkins 全局免密 sudo。
+
 ## 测试
 
 ```bash

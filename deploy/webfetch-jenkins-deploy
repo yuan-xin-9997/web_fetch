@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+source_dir="$(realpath "${1:?Jenkins workspace is required}")"
+case "$source_dir" in
+  /var/lib/jenkins/workspace/*) ;;
+  *) echo "source must be a Jenkins workspace" >&2; exit 2 ;;
+esac
+
+set -a
+source /etc/webfetch/service.env
+set +a
+
+app_root="${WEBFETCH_APP_ROOT:?WEBFETCH_APP_ROOT is required}"
+service_user="webfetch"
+release_id="${BUILD_TAG:-jenkins-$(date -u +%Y%m%d%H%M%S)}"
+release_id="${release_id//[^a-zA-Z0-9_.-]/-}"
+release_dir="$app_root/releases/$release_id"
+previous="$(readlink -f "$app_root/current" 2>/dev/null || true)"
+services=(webfetch-browser-worker webfetch-http-worker webfetch-api)
+
+for service in "${services[@]}"; do
+  systemctl stop "$service" 2>/dev/null || true
+done
+
+install -d -o "$service_user" -g "$service_user" "$release_dir"
+rsync -a --delete \
+  --exclude .git --exclude .jenkins-venv --exclude data --exclude __pycache__ \
+  "$source_dir/" "$release_dir/"
+chown -R "$service_user:$service_user" "$release_dir"
+
+sudo -u "$service_user" python3 -m venv "$release_dir/.venv"
+sudo -u "$service_user" "$release_dir/.venv/bin/python" -m pip install "$release_dir[browser]"
+sudo -u "$service_user" "$release_dir/.venv/bin/playwright" install chromium
+"$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
+ln -sfn "$release_dir" "$app_root/current"
+systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker
+
+port="${WEBFETCH_SERVER__PORT:-33333}"
+if ! curl --fail --silent --show-error "http://127.0.0.1:$port/health/ready" >/dev/null; then
+  if [[ -n "$previous" && -d "$previous" ]]; then
+    ln -sfn "$previous" "$app_root/current"
+    systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker
+  fi
+  echo "deployment health check failed; rollback attempted" >&2
+  exit 1
+fi
+
+echo "deployed_release=$release_dir"
+

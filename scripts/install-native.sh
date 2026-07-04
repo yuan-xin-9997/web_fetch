@@ -39,7 +39,7 @@ ln -sfn "$release_dir" "$app_root/current"
 set -a
 source /etc/webfetch/service.env
 set +a
-sudo -u "$service_user" "$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
+"$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
 systemctl daemon-reload
 systemctl enable webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
@@ -55,4 +55,3 @@ if ! curl --fail --silent --show-error "http://127.0.0.1:$port/health/ready" >/d
 fi
 
 echo "deployed_release=$release_dir"
-
