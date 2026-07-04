@@ -280,6 +280,7 @@ class Adapter(Protocol):
 
 - `generic.article@1`：标题、正文、作者、日期、链接、meta；
 - `generic.links@1`：页面链接列表。
+- `china.official-profile@1`：中央媒体及中央国家机关页面的人物基本信息、现任职务和时间线履历。
 
 首批目标覆盖中国中央媒体、中国主流媒体和欧美主流媒体。由于“媒体官网”不是稳定的单一页面协议，首版以 `generic.article@1` 配合域名策略承接；只有获得具体 URL 和失败样本后才增加站点专用适配器，避免在没有证据时编写脆弱选择器。
 

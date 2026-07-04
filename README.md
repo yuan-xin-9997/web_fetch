@@ -51,6 +51,8 @@ Authorization: Bearer <API_KEY>
 | POST | `/v1/extract` | 抓取并解析或重新解析 artifact |
 | GET | `/v1/artifacts/{artifact_id}` | 读取原始响应 |
 
+人物履历页面可指定 `china.official-profile` 适配器，输出 `summary`、`current_position` 和结构化 `timeline`。
+
 抓取示例：
 
 ```bash

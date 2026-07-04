@@ -56,9 +56,12 @@ class GenericLinksAdapter:
 
 class AdapterRegistry:
     def __init__(self) -> None:
+        from .china_profile import ChinaOfficialProfileAdapter
+
         self._adapters: dict[tuple[str, str], Adapter] = {}
         self.register(GenericArticleAdapter())
         self.register(GenericLinksAdapter())
+        self.register(ChinaOfficialProfileAdapter())
 
     def register(self, adapter: Adapter) -> None:
         self._adapters[(adapter.name, adapter.version)] = adapter
