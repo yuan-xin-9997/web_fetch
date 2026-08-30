@@ -81,7 +81,12 @@ class FetchService:
         )
         async with self.rate_limiter.slot(domain):
             if request.mode == FetchMode.BROWSER:
-                raw = await self.browser_fetcher.fetch(url, request.headers, request.profile)
+                try:
+                    raw = await self.browser_fetcher.fetch(url, request.headers, request.profile)
+                except WebFetchError:
+                    if not request.http_fallback:
+                        raise
+                    raw = await self.http_fetcher.fetch(url, request.headers, request.timeout_seconds, use_proxy)
             else:
                 raw = await self.http_fetcher.fetch(url, request.headers, request.timeout_seconds, use_proxy)
                 reason = self._browser_upgrade_reason(raw, request)

@@ -36,3 +36,90 @@ def test_production_rejects_default_key() -> None:
         assert "forbidden" in str(exc)
     else:
         raise AssertionError("default key accepted")
+
+
+def _fallback_service(http_fetcher, browser_fetcher) -> FetchService:
+    from webfetch_service.services.cache import MemoryCache
+    from webfetch_service.services.rate_limit import DomainRateLimiter
+
+    return FetchService(
+        settings=Settings(),
+        http_fetcher=http_fetcher,
+        browser_fetcher=browser_fetcher,
+        cache=MemoryCache(),
+        artifacts=None,
+        rate_limiter=DomainRateLimiter(interval_seconds=0, concurrency=4),
+    )
+
+
+async def test_browser_mode_falls_back_to_http_when_allowed(tmp_path) -> None:
+    from unittest.mock import AsyncMock
+
+    from webfetch_service.core.errors import WebFetchError
+    from webfetch_service.fetch.http import RawFetchResult
+
+    raw_http = RawFetchResult(
+        final_url="https://example.com/list",
+        status_code=200,
+        headers={"content-type": "text/html; charset=utf-8"},
+        body=b"<html><body>rendered-fallback</body></html>",
+        strategy="http",
+    )
+    browser = AsyncMock()
+    browser.fetch = AsyncMock(side_effect=WebFetchError("BROWSER_FAILED", "浏览器抓取失败", 502, True))
+    http = AsyncMock()
+    http.fetch = AsyncMock(return_value=raw_http)
+    service = _fallback_service(http, browser)
+
+    response = await service.fetch(
+        FetchRequest(
+            url="https://example.com/list",
+            mode="browser",
+            http_fallback=True,
+            save_artifact=False,
+            cache_ttl=0,
+        ),
+        "req-fallback",
+    )
+
+    assert response.strategy == "http"
+    assert response.body == "<html><body>rendered-fallback</body></html>"
+    browser.fetch.assert_awaited_once()
+    http.fetch.assert_awaited_once()
+
+
+async def test_browser_mode_failure_propagates_without_fallback(tmp_path) -> None:
+    from unittest.mock import AsyncMock
+
+    import pytest
+
+    from webfetch_service.core.errors import WebFetchError
+    from webfetch_service.fetch.http import RawFetchResult
+
+    browser = AsyncMock()
+    browser.fetch = AsyncMock(side_effect=WebFetchError("BROWSER_FAILED", "浏览器抓取失败", 502, True))
+    http = AsyncMock()
+    http.fetch = AsyncMock(
+        return_value=RawFetchResult(
+            final_url="https://example.com/list",
+            status_code=200,
+            headers={"content-type": "text/html"},
+            body=b"<html></html>",
+            strategy="http",
+        )
+    )
+    service = _fallback_service(http, browser)
+
+    with pytest.raises(WebFetchError) as caught:
+        await service.fetch(
+            FetchRequest(
+                url="https://example.com/list",
+                mode="browser",
+                save_artifact=False,
+                cache_ttl=0,
+            ),
+            "req-no-fallback",
+        )
+
+    assert caught.value.code == "BROWSER_FAILED"
+    http.fetch.assert_not_awaited()

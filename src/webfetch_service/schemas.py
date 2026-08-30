@@ -30,6 +30,7 @@ class FetchRequest(BaseModel):
     save_artifact: bool | None = None
     timeout_seconds: float | None = Field(default=None, gt=0, le=300)
     required_selector: str | None = Field(default=None, max_length=500)
+    http_fallback: bool = False
 
 
 class AttemptInfo(BaseModel):
