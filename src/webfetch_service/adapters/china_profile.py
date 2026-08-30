@@ -6,6 +6,7 @@ from urllib.parse import urlsplit
 
 import lxml.html
 
+from webfetch_service.adapters.encoding import decode_html
 from webfetch_service.core.errors import WebFetchError
 
 PROFILE_SELECTORS: dict[str, tuple[str, ...]] = {
@@ -56,12 +57,7 @@ class ChinaOfficialProfileAdapter:
 
     @staticmethod
     def _decode_html(body: bytes) -> str:
-        match = re.search(br"charset\s*=\s*['\"]?([a-zA-Z0-9._-]+)", body[:4096], re.IGNORECASE)
-        encoding = match.group(1).decode("ascii") if match else "utf-8"
-        try:
-            return body.decode(encoding, errors="replace")
-        except LookupError:
-            return body.decode("utf-8", errors="replace")
+        return decode_html(body)
 
     @staticmethod
     def _find_container(tree, host: str):

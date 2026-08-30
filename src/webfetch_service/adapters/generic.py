@@ -5,6 +5,7 @@ from urllib.parse import urljoin
 
 import lxml.html
 
+from webfetch_service.adapters.encoding import decode_html
 from webfetch_service.core.errors import WebFetchError
 
 
@@ -21,7 +22,7 @@ class GenericArticleAdapter:
 
     async def extract(self, body: bytes, base_url: str) -> dict[str, Any]:
         try:
-            tree = lxml.html.fromstring(body)
+            tree = lxml.html.fromstring(decode_html(body))
         except (ValueError, lxml.etree.ParserError) as exc:
             raise WebFetchError("PARSE_FAILED", "HTML解析失败", 422) from exc
         for node in tree.xpath("//script|//style|//noscript|//nav|//footer"):
@@ -43,7 +44,7 @@ class GenericLinksAdapter:
 
     async def extract(self, body: bytes, base_url: str) -> dict[str, Any]:
         try:
-            tree = lxml.html.fromstring(body)
+            tree = lxml.html.fromstring(decode_html(body))
         except (ValueError, lxml.etree.ParserError) as exc:
             raise WebFetchError("PARSE_FAILED", "HTML解析失败", 422) from exc
         return {
