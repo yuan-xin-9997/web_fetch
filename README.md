@@ -134,6 +134,8 @@ pip install -e '.[browser]'
 playwright install chromium
 ```
 
+浏览器依赖固定为 Playwright 1.62.0，部署时应同时使用该版本安装的 Chromium，避免 Python 包升级后找不到匹配的浏览器文件。
+
 ## Linux 原生部署
 
 目标系统为 Ubuntu Server 24.04，不使用 Docker。
