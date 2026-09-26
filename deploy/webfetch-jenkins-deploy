@@ -57,10 +57,6 @@ cleanup_old_releases() {
   done
 }
 
-for service in "${services[@]}"; do
-  systemctl stop "$service" 2>/dev/null || true
-done
-
 install -d -o "$service_user" -g "$service_user" "$release_dir"
 rsync -a --delete \
   --exclude .git --exclude .jenkins-venv --exclude data --exclude __pycache__ \
@@ -71,6 +67,9 @@ sudo -u "$service_user" python3 -m venv "$release_dir/.venv"
 sudo -u "$service_user" "$release_dir/.venv/bin/python" -m pip install "$release_dir[browser]"
 sudo -u "$service_user" "$release_dir/.venv/bin/playwright" install chromium
 "$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
+for service in "${services[@]}"; do
+  systemctl stop "$service" 2>/dev/null || true
+done
 ln -sfn "$release_dir" "$app_root/current"
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker
 

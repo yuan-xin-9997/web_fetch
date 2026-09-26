@@ -23,3 +23,9 @@ def test_release_cleanup_is_configurable_and_protects_current() -> None:
     assert "(( keep < 2 ))" in content
     assert '[[ "$candidate" == "$current_release" ]]' in content
     assert '[[ "$(dirname "$candidate")" != "$(realpath "$releases_dir")" ]]' in content
+
+
+def test_services_stop_only_after_new_release_is_prepared() -> None:
+    content = SCRIPT.read_text(encoding="utf-8")
+    assert content.index('pip install "$release_dir[browser]"') < content.index('systemctl stop "$service"')
+    assert content.index('playwright" install chromium') < content.index('systemctl stop "$service"')

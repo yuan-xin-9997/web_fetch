@@ -14,10 +14,6 @@ if [[ ! -f /etc/webfetch/service.env ]]; then
   exit 2
 fi
 
-for service in "${services[@]}"; do
-  systemctl stop "$service" 2>/dev/null || true
-done
-
 install -d -o "$service_user" -g "$service_user" "$app_root/releases" /var/lib/webfetch/artifacts
 install -d -m 0750 -o root -g "$service_user" /etc/webfetch
 install -d "$release_dir"
@@ -38,6 +34,9 @@ install -m 0644 "$release_dir"/deploy/systemd/*.timer /etc/systemd/system/
 ln -sfn "$release_dir" "$app_root/current"
 port="$(sed -n 's/^WEBFETCH_SERVER__PORT=//p' /etc/webfetch/service.env | tail -n 1)"
 "$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
+for service in "${services[@]}"; do
+  systemctl stop "$service" 2>/dev/null || true
+done
 systemctl daemon-reload
 systemctl enable webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
