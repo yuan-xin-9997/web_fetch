@@ -29,3 +29,10 @@ def test_services_stop_only_after_new_release_is_prepared() -> None:
     content = SCRIPT.read_text(encoding="utf-8")
     assert content.index('pip install "$release_dir[browser]"') < content.index('systemctl stop "$service"')
     assert content.index('playwright" install chromium') < content.index('systemctl stop "$service"')
+
+
+def test_migration_receives_server_environment_without_shell_sourcing() -> None:
+    content = SCRIPT.read_text(encoding="utf-8")
+    assert 'dotenv_values("/etc/webfetch/service.env", interpolate=False)' in content
+    assert 'env=environment, check=True' in content
+    assert 'source /etc/webfetch/service.env' not in content

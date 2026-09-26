@@ -303,7 +303,7 @@ src/JenkinsConfig/Jenkinsfile
 Pipeline 每 30 分钟轮询 SCM；只有存在新提交时触发。流水线执行检出、依赖安装、静态检查、覆盖率不低于 80% 的测试、原生发布和健康检查。Jenkins 运行用户需要对限定的部署脚本和相关 systemd 服务拥有 sudo 权限。
 
 生产部署使用 root 所有的固定入口 `deploy/webfetch-jenkins-deploy`。应将它安装为 `/usr/local/sbin/webfetch-jenkins-deploy`，并只为 Jenkins 放行这一条 sudo 命令，禁止授予 Jenkins 全局免密 sudo。
-部署入口仅读取所需的配置键，不将整个 `service.env` 当作 shell 脚本执行；配置中的列表和带空格的值因此不会中断部署。
+部署入口仅读取所需的配置键；数据库迁移通过 dotenv 将 `service.env` 传给子进程，不将整个文件当作 shell 脚本执行。配置中的列表和带空格的值因此不会中断部署。
 新 release 的依赖和浏览器安装完成后才短暂停止旧服务并切换 `current`，避免下载依赖期间出现长时间停机。
 仓库中的 `deploy/sudoers-webfetch-jenkins` 给出了与 `WebFetchService` Job 精确匹配的 sudoers 规则。
 

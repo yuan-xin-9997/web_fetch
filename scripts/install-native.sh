@@ -33,7 +33,24 @@ install -m 0644 "$release_dir"/deploy/systemd/*.timer /etc/systemd/system/
 
 ln -sfn "$release_dir" "$app_root/current"
 port="$(sed -n 's/^WEBFETCH_SERVER__PORT=//p' /etc/webfetch/service.env | tail -n 1)"
-"$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
+"$release_dir/.venv/bin/python" - "$release_dir" <<'PY'
+import os
+import subprocess
+import sys
+
+from dotenv import dotenv_values
+
+release_dir = sys.argv[1]
+environment = os.environ.copy()
+environment.update({
+    key: value for key, value in dotenv_values("/etc/webfetch/service.env", interpolate=False).items()
+    if value is not None
+})
+subprocess.run(
+    [f"{release_dir}/.venv/bin/alembic", "-c", f"{release_dir}/alembic.ini", "upgrade", "head"],
+    env=environment, check=True,
+)
+PY
 for service in "${services[@]}"; do
   systemctl stop "$service" 2>/dev/null || true
 done
