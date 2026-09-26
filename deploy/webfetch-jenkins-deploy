@@ -7,11 +7,13 @@ case "$source_dir" in
   *) echo "source must be a Jenkins workspace" >&2; exit 2 ;;
 esac
 
-set -a
-source /etc/webfetch/service.env
-set +a
+read_config() {
+  local key="$1"
+  sed -n "s/^${key}=//p" /etc/webfetch/service.env | tail -n 1
+}
 
-app_root="${WEBFETCH_APP_ROOT:?WEBFETCH_APP_ROOT is required}"
+app_root="$(read_config WEBFETCH_APP_ROOT)"
+: "${app_root:?WEBFETCH_APP_ROOT is required}"
 service_user="webfetch"
 release_id="${BUILD_TAG:-jenkins-$(date -u +%Y%m%d%H%M%S)}"
 release_id="${release_id//[^a-zA-Z0-9_.-]/-}"
@@ -21,7 +23,8 @@ services=(webfetch-browser-worker webfetch-http-worker webfetch-api)
 
 cleanup_old_releases() {
   local releases_dir="$app_root/releases"
-  local keep="${WEBFETCH_RELEASES_TO_KEEP:-5}"
+  local keep="$(read_config WEBFETCH_RELEASES_TO_KEEP)"
+  keep="${keep:-5}"
   local current_release candidate
   local index=0
   local -a release_dirs=()
@@ -71,7 +74,8 @@ sudo -u "$service_user" "$release_dir/.venv/bin/playwright" install chromium
 ln -sfn "$release_dir" "$app_root/current"
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker
 
-port="${WEBFETCH_SERVER__PORT:-33333}"
+port="$(read_config WEBFETCH_SERVER__PORT)"
+port="${port:-33333}"
 ready=false
 for _ in $(seq 1 30); do
   if curl --fail --silent "http://127.0.0.1:$port/health/ready" >/dev/null; then

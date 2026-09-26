@@ -301,6 +301,7 @@ src/JenkinsConfig/Jenkinsfile
 Pipeline 每 30 分钟轮询 SCM；只有存在新提交时触发。流水线执行检出、依赖安装、静态检查、覆盖率不低于 80% 的测试、原生发布和健康检查。Jenkins 运行用户需要对限定的部署脚本和相关 systemd 服务拥有 sudo 权限。
 
 生产部署使用 root 所有的固定入口 `deploy/webfetch-jenkins-deploy`。应将它安装为 `/usr/local/sbin/webfetch-jenkins-deploy`，并只为 Jenkins 放行这一条 sudo 命令，禁止授予 Jenkins 全局免密 sudo。
+部署入口仅读取所需的配置键，不将整个 `service.env` 当作 shell 脚本执行；配置中的列表和带空格的值因此不会中断部署。
 仓库中的 `deploy/sudoers-webfetch-jenkins` 给出了与 `WebFetchService` Job 精确匹配的 sudoers 规则。
 
 部署脚本在新版本健康检查成功后自动清理旧发布目录。默认保留 `/opt/webfetch/releases` 下最近 5 个版本，可通过 `/etc/webfetch/service.env` 中的 `WEBFETCH_RELEASES_TO_KEEP` 调整，最小值为 2；`/opt/webfetch/current` 指向的版本始终受到保护。健康检查失败并回滚时不会执行清理。

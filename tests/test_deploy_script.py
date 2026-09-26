@@ -18,7 +18,8 @@ def test_release_cleanup_runs_only_after_successful_health_check() -> None:
 def test_release_cleanup_is_configurable_and_protects_current() -> None:
     content = SCRIPT.read_text(encoding="utf-8")
 
-    assert '${WEBFETCH_RELEASES_TO_KEEP:-5}' in content
+    assert 'read_config WEBFETCH_RELEASES_TO_KEEP' in content
+    assert 'keep="${keep:-5}"' in content
     assert "(( keep < 2 ))" in content
     assert '[[ "$candidate" == "$current_release" ]]' in content
     assert '[[ "$(dirname "$candidate")" != "$(realpath "$releases_dir")" ]]' in content

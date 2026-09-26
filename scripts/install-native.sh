@@ -36,15 +36,13 @@ install -m 0644 "$release_dir"/deploy/systemd/*.service /etc/systemd/system/
 install -m 0644 "$release_dir"/deploy/systemd/*.timer /etc/systemd/system/
 
 ln -sfn "$release_dir" "$app_root/current"
-set -a
-source /etc/webfetch/service.env
-set +a
+port="$(sed -n 's/^WEBFETCH_SERVER__PORT=//p' /etc/webfetch/service.env | tail -n 1)"
 "$release_dir/.venv/bin/alembic" -c "$release_dir/alembic.ini" upgrade head
 systemctl daemon-reload
 systemctl enable webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker webfetch-maintenance.timer
 
-port="${WEBFETCH_SERVER__PORT:-33333}"
+port="${port:-33333}"
 ready=false
 for _ in $(seq 1 30); do
   if curl --fail --silent "http://127.0.0.1:$port/health/ready" >/dev/null; then
