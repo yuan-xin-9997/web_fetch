@@ -252,6 +252,8 @@ Fetch Key 是以下规范化数据的 SHA-256：
 
 Playwright 是可选运行依赖。未安装时 `browser` 请求返回 `BROWSER_UNAVAILABLE`，不得静默回退并伪称浏览器成功。
 
+Chromium 进程按服务实例复用，代理仅在请求对应的 Browser Context 中配置。`/health/ready` 在启用 browser 时检查进程可启动且仍连接，不发起外部网页请求。浏览器启动和导航异常写入内部日志堆栈；API 只给出不含内部配置的错误码。挑战页返回 `SITE_BLOCKED`，不会进入缓存和 artifact 存储。
+
 ## 11. Artifact 设计
 
 目录结构：

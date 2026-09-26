@@ -20,7 +20,10 @@ from .cache import Cache, CachedFetch
 from .rate_limit import DomainRateLimiter
 
 FORBIDDEN_HEADERS = {"host", "content-length", "connection", "proxy-authorization"}
-CHALLENGE_MARKERS = ("enable javascript", "javascript is required", "cf-chl-", "just a moment...")
+CHALLENGE_MARKERS = (
+    "enable javascript", "javascript is required", "cf-chl-", "just a moment...",
+    "are we human?", "checking your browser",
+)
 
 
 class FetchService:
@@ -82,7 +85,7 @@ class FetchService:
         async with self.rate_limiter.slot(domain):
             if request.mode == FetchMode.BROWSER:
                 try:
-                    raw = await self.browser_fetcher.fetch(url, request.headers, request.profile)
+                    raw = await self.browser_fetcher.fetch(url, request.headers, request.profile, use_proxy)
                 except WebFetchError:
                     if not request.http_fallback:
                         raise
@@ -92,10 +95,12 @@ class FetchService:
                 reason = self._browser_upgrade_reason(raw, request)
                 if request.mode == FetchMode.AUTO and reason:
                     http_attempts = raw.attempts
-                    raw = await self.browser_fetcher.fetch(url, request.headers, request.profile)
+                    raw = await self.browser_fetcher.fetch(url, request.headers, request.profile, use_proxy)
                     if http_attempts:
                         http_attempts[-1].upgrade_reason = reason
                     raw.attempts = http_attempts + raw.attempts
+        if self._is_blocked(raw):
+            raise WebFetchError("SITE_BLOCKED", "目标网站拒绝自动访问或要求人机验证", 403)
         artifact_id = None
         save = (
             self.settings.storage.save_artifacts_by_default if request.save_artifact is None else request.save_artifact
@@ -153,6 +158,15 @@ class FetchService:
             except (ValueError, lxml.etree.ParserError):
                 return "invalid_html"
         return None
+
+    @classmethod
+    def _is_blocked(cls, result: RawFetchResult) -> bool:
+        if "html" not in result.content_type.lower():
+            return False
+        body = cls._decode(result.body, result.content_type).lower()
+        return any(marker in body for marker in CHALLENGE_MARKERS) or (
+            result.status_code == 403 and ("cloudflare" in body or "access denied" in body)
+        )
 
     @staticmethod
     def _validate_headers(headers: dict[str, str]) -> None:

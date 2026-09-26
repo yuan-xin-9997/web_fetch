@@ -179,6 +179,7 @@ API Key 面向调用 WebFetch 的下游业务系统，用于证明调用方身�
 |---|---:|---|
 | FR-STRATEGY-001 | P0 | `http` 模式仅使用 HTTP 客户端，不隐式启动浏览器。 |
 | FR-STRATEGY-002 | P0 | `browser` 模式使用 Playwright Chromium，并复用浏览器进程。 |
+| FR-STRATEGY-002A | P0 | 浏览器按请求代理策略选择直连或代理；识别 Cloudflare 和人机验证页并返回 `SITE_BLOCKED`，不得将其作为正常资讯内容。 |
 | FR-STRATEGY-003 | P0 | 每次浏览器任务使用隔离的 Browser Context；同一 Profile 可按策略复用持久化登录态。 |
 | FR-STRATEGY-004 | P0 | `auto` 首先尝试 HTTP，再根据状态码、正文特征及站点配置决定是否升级到浏览器。 |
 | FR-STRATEGY-005 | P0 | 自动升级信号至少包括 `403`、`429`、部分 `5xx`、正文过短、JavaScript 提示和关键选择器缺失。 |

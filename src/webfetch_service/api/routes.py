@@ -42,6 +42,8 @@ async def ready(request: Request) -> JSONResponse:
             checks["database"] = await request.app.state.database.ping()
         except Exception:
             checks["database"] = False
+    if request.app.state.settings.browser.enabled:
+        checks["browser"] = await request.app.state.browser_fetcher.is_ready()
     ok = all(checks.values())
     return JSONResponse({"status": "ok" if ok else "not_ready", "checks": checks}, status_code=200 if ok else 503)
 

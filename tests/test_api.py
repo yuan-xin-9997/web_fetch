@@ -6,6 +6,7 @@ from pydantic import SecretStr
 
 from webfetch_service.core.config import (
     AuthSettings,
+    BrowserSettings,
     DatabaseSettings,
     FetchSettings,
     SecuritySettings,
@@ -121,3 +122,24 @@ async def test_ready_reports_dependency_failure(tmp_path) -> None:
             response = await client.get("/health/ready")
             assert response.status_code == 503
             assert response.json()["checks"]["cache"] is False
+
+
+@pytest.mark.asyncio
+async def test_ready_checks_browser_without_fetching_webpage(tmp_path) -> None:
+    settings = make_settings(tmp_path)
+    settings.browser = BrowserSettings(enabled=True)
+    app = create_app(settings, httpx.MockTransport(upstream))
+    calls = 0
+
+    async def browser_ready() -> bool:
+        nonlocal calls
+        calls += 1
+        return False
+
+    app.state.browser_fetcher.is_ready = browser_ready
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://service") as client:
+            response = await client.get("/health/ready")
+            assert response.status_code == 503
+            assert response.json()["checks"]["browser"] is False
+            assert calls == 1

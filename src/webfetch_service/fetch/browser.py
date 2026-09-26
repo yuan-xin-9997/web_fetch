@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 
@@ -10,6 +11,8 @@ from webfetch_service.core.security import UrlGuard
 from webfetch_service.schemas import AttemptInfo
 
 from .http import RawFetchResult
+
+logger = logging.getLogger(__name__)
 
 
 class BrowserFetcher:
@@ -26,17 +29,29 @@ class BrowserFetcher:
         if not self.settings.enabled:
             return
         async with self._lock:
-            if self._browser is not None:
+            if self._browser is not None and self._browser.is_connected():
                 return
+            await self.close()
             try:
                 from playwright.async_api import async_playwright
             except ImportError as exc:
                 raise WebFetchError("BROWSER_UNAVAILABLE", "浏览器运行依赖未安装", 503) from exc
-            self._playwright = await async_playwright().start()
-            options: dict[str, Any] = {"headless": True}
-            if self.proxy_url:
-                options["proxy"] = {"server": self.proxy_url}
-            self._browser = await self._playwright.chromium.launch(**options)
+            try:
+                self._playwright = await async_playwright().start()
+                self._browser = await self._playwright.chromium.launch(headless=True)
+            except Exception as exc:
+                logger.exception("browser startup failed")
+                await self.close()
+                raise WebFetchError("BROWSER_UNAVAILABLE", "浏览器启动失败", 503, True) from exc
+
+    async def is_ready(self) -> bool:
+        if not self.settings.enabled:
+            return True
+        try:
+            await self.start()
+            return bool(self._browser and self._browser.is_connected())
+        except WebFetchError:
+            return False
 
     async def close(self) -> None:
         if self._browser:
@@ -47,7 +62,7 @@ class BrowserFetcher:
             self._playwright = None
 
     async def fetch(
-        self, url: str, headers: dict[str, str] | None = None, profile: str = "anonymous"
+        self, url: str, headers: dict[str, str] | None = None, profile: str = "anonymous", use_proxy: bool = False
     ) -> RawFetchResult:
         del profile
         if not self.settings.enabled:
@@ -56,7 +71,14 @@ class BrowserFetcher:
         await self.start()
         started = time.monotonic()
         async with self._semaphore:
-            context = await self._browser.new_context(extra_http_headers=headers or {})
+            options: dict[str, Any] = {"extra_http_headers": headers or {}}
+            if use_proxy and self.proxy_url:
+                options["proxy"] = {"server": self.proxy_url}
+            try:
+                context = await self._browser.new_context(**options)
+            except Exception as exc:
+                logger.exception("browser context creation failed")
+                raise WebFetchError("BROWSER_FAILED", "浏览器抓取失败", 502, True) from exc
             try:
                 page = await context.new_page()
 
@@ -88,6 +110,7 @@ class BrowserFetcher:
             except WebFetchError:
                 raise
             except Exception as exc:
+                logger.exception("browser navigation failed")
                 raise WebFetchError("BROWSER_FAILED", "浏览器抓取失败", 502, True) from exc
             finally:
                 await context.close()

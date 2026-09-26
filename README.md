@@ -32,7 +32,7 @@ WebFetch 是一个供多个业务系统共用的网页抓取基础服务。业�
 - `/openapi.json`：OpenAPI 契约；
 - `/metrics`：Prometheus 指标；
 - `/health/live`：进程存活检查；
-- `/health/ready`：数据库、缓存和文件存储就绪检查。
+- `/health/ready`：数据库、缓存、文件存储，以及启用时的 Chromium 就绪检查。浏览器检查只启动或检查本地进程，不访问外部网页。
 
 业务接口均位于 `/v1` 下，除健康检查和指标外需携带：
 
@@ -100,6 +100,7 @@ curl -X POST 'http://server-host:33333/v1/fetch' \
 | `WEBFETCH_STORAGE__ARTIFACT_ROOT` | `./data/artifacts` | 原始文件目录 |
 | `WEBFETCH_PROXY__HTTP_URL` | 空 | 可选 HTTP 代理 |
 | `WEBFETCH_BROWSER__ENABLED` | `false` | 是否启用 Playwright |
+| `WEBFETCH_PROXY__DEFAULT_POLICY` | `direct` | 默认代理策略；browser 与 HTTP 均按每次请求的策略选择代理 |
 | `WEBFETCH_FETCH__MAX_RESPONSE_BYTES` | `10485760` | 最大响应字节数 |
 | `WEBFETCH_SECURITY__ALLOWED_HOSTS` | `[]` | 显式放行的内网主机 |
 
@@ -243,6 +244,8 @@ journalctl -u webfetch-api -f
 systemctl restart webfetch-api webfetch-http-worker webfetch-browser-worker
 systemctl list-timers webfetch-maintenance.timer
 ```
+
+浏览器启动或导航失败时，服务日志保留内部异常堆栈；API 仅返回稳定错误码，不返回代理配置。`BROWSER_UNAVAILABLE` 表示 Chromium 无法启动，`BROWSER_FAILED` 表示浏览器导航失败，`SITE_BLOCKED` 表示目标站点提供了 Cloudflare 或人机验证页面。排障时先检查 `/health/ready` 的 `browser` 项，再查看 API 日志。真实站点拦截页不能作为资讯内容使用。
 
 ### systemd 服务
 

@@ -123,3 +123,25 @@ async def test_browser_mode_failure_propagates_without_fallback(tmp_path) -> Non
 
     assert caught.value.code == "BROWSER_FAILED"
     http.fetch.assert_not_awaited()
+
+
+async def test_browser_challenge_page_is_rejected(tmp_path) -> None:
+    from unittest.mock import AsyncMock
+
+    import pytest
+
+    from webfetch_service.core.errors import WebFetchError
+    from webfetch_service.fetch.http import RawFetchResult
+
+    browser = AsyncMock()
+    browser.fetch = AsyncMock(return_value=RawFetchResult(
+        final_url="https://example.com/list", status_code=200,
+        headers={"content-type": "text/html"},
+        body=b"<html><title>Are we human?</title></html>", strategy="browser",
+    ))
+    service = _fallback_service(AsyncMock(), browser)
+    with pytest.raises(WebFetchError) as caught:
+        await service.fetch(FetchRequest(
+            url="https://example.com/list", mode="browser", save_artifact=False, cache_ttl=0,
+        ))
+    assert caught.value.code == "SITE_BLOCKED"
